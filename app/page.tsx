@@ -1,5 +1,5 @@
 "use client";
-
+import { supabase } from "@/lib/supabase";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
@@ -22,7 +22,7 @@ type Comment = {
   id: number;
   name: string;
   message: string;
-  date: string;
+  created_at: string;
 };
 
 const navItems = [
@@ -121,7 +121,7 @@ const projects = [
 
 const photos = [
   {
-    src: "/photo-1.jpg",
+    src: "/photo1.jpg",
     title: "Portrait",
     category: "Photography",
   },
@@ -758,7 +758,7 @@ export default function Home() {
               </div>
 
               <img
-                src="/photo-3.jpg"
+                src="/photo3.jpg"
                 alt="Aulia visual work"
                 className="editing-image-small"
               />
@@ -964,7 +964,7 @@ export default function Home() {
           </div>
 
           <div className="footer-info">
-            <span>BASED IN INDONESIA</span>
+            <span>power by</span>
 
             <a
               href={INSTAGRAM_URL}
