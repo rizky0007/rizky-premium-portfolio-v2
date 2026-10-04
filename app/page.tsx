@@ -1,6 +1,8 @@
 "use client";
-import { supabase } from "@/lib/supabase";
+
+import { supabase } from "../lib/supabase";
 import { FormEvent, useEffect, useRef, useState } from "react";
+
 import {
   ArrowDown,
   ArrowUp,
@@ -16,7 +18,25 @@ import {
   X,
 } from "lucide-react";
 
+/* =========================================================
+   CONFIG
+========================================================= */
+
 const INSTAGRAM_URL = "https://www.instagram.com/";
+
+const navItems = [
+  { label: "Home", id: "home" },
+  { label: "About", id: "about" },
+  { label: "Communication", id: "communication" },
+  { label: "Journey", id: "journey" },
+  { label: "Photography", id: "photography" },
+  { label: "Editing", id: "editing" },
+  { label: "Contact", id: "contact" },
+];
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 type Comment = {
   id: number;
@@ -25,14 +45,9 @@ type Comment = {
   created_at: string;
 };
 
-const navItems = [
-  { label: "Home", id: "home" },
-  { label: "About", id: "about" },
-  { label: "Communication", id: "communication" },
-  { label: "Photography", id: "photography" },
-  { label: "Editing", id: "editing" },
-  { label: "Contact", id: "contact" },
-];
+/* =========================================================
+   DATA
+========================================================= */
 
 const journey = [
   {
@@ -137,6 +152,10 @@ const photos = [
   },
 ];
 
+/* =========================================================
+   COMPONENT
+========================================================= */
+
 export default function Home() {
   const [loaded, setLoaded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -147,10 +166,17 @@ export default function Home() {
 
   const [name, setName] = useState("");
   const [comment, setComment] = useState("");
+
   const [comments, setComments] = useState<Comment[]>([]);
+  const [commentLoading, setCommentLoading] = useState(false);
+  const [commentsLoading, setCommentsLoading] = useState(true);
   const [commentSent, setCommentSent] = useState(false);
 
   const heroPhotoRef = useRef<HTMLImageElement>(null);
+
+  /* =========================================================
+     INITIAL LOAD
+  ========================================================= */
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("aulia-theme");
@@ -159,25 +185,22 @@ export default function Home() {
       setDarkMode(true);
       document.documentElement.classList.add("dark");
     } else {
+      setDarkMode(false);
       document.documentElement.classList.remove("dark");
     }
 
-    const savedComments = localStorage.getItem("aulia-comments");
-
-    if (savedComments) {
-      try {
-        setComments(JSON.parse(savedComments));
-      } catch {
-        setComments([]);
-      }
-    }
-
-    const timer = setTimeout(() => {
+    const timer = window.setTimeout(() => {
       setLoaded(true);
     }, 900);
 
-    return () => clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, []);
+
+  /* =========================================================
+     BODY SCROLL
+  ========================================================= */
 
   useEffect(() => {
     document.body.style.overflow = loaded ? "" : "hidden";
@@ -187,9 +210,14 @@ export default function Home() {
     };
   }, [loaded]);
 
+  /* =========================================================
+     SCROLL
+  ========================================================= */
+
   useEffect(() => {
     const handleScroll = () => {
       const scrollTop = window.scrollY;
+
       const documentHeight =
         document.documentElement.scrollHeight - window.innerHeight;
 
@@ -201,27 +229,43 @@ export default function Home() {
 
       if (heroPhotoRef.current) {
         const offset = Math.min(scrollTop * 0.08, 80);
+
         heroPhotoRef.current.style.transform = `translateY(${offset}px)`;
       }
     };
 
     handleScroll();
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
 
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, []);
 
+  /* =========================================================
+     ACTIVE SECTION
+  ========================================================= */
+
   useEffect(() => {
+    if (!loaded) return;
+
     const sections = navItems
       .map((item) => document.getElementById(item.id))
       .filter(Boolean) as HTMLElement[];
+
+    if (sections.length === 0) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
           .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+          .sort(
+            (a, b) =>
+              b.intersectionRatio - a.intersectionRatio
+          );
 
         if (visible[0]) {
           setActiveSection(visible[0].target.id);
@@ -235,11 +279,21 @@ export default function Home() {
 
     sections.forEach((section) => observer.observe(section));
 
-    return () => observer.disconnect();
-  }, []);
+    return () => {
+      observer.disconnect();
+    };
+  }, [loaded]);
+
+  /* =========================================================
+     REVEAL ANIMATION
+  ========================================================= */
 
   useEffect(() => {
+    if (!loaded) return;
+
     const elements = document.querySelectorAll(".reveal");
+
+    if (elements.length === 0) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -257,13 +311,73 @@ export default function Home() {
 
     elements.forEach((element) => observer.observe(element));
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+    };
   }, [loaded]);
+
+  /* =========================================================
+     THEME
+  ========================================================= */
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
-    localStorage.setItem("aulia-theme", darkMode ? "dark" : "light");
+
+    localStorage.setItem(
+      "aulia-theme",
+      darkMode ? "dark" : "light"
+    );
   }, [darkMode]);
+
+  /* =========================================================
+     LOAD COMMENTS FROM SUPABASE
+  ========================================================= */
+
+  useEffect(() => {
+    if (!loaded) return;
+
+    const loadComments = async () => {
+      setCommentsLoading(true);
+
+      try {
+        const { data, error } = await supabase
+          .from("comments")
+          .select("id, name, message, created_at")
+          .order("created_at", {
+            ascending: false,
+          });
+
+        if (error) {
+          console.error(
+            "Gagal mengambil komentar:",
+            error
+          );
+
+          setComments([]);
+          return;
+        }
+
+        if (data) {
+          setComments(data as Comment[]);
+        }
+      } catch (error) {
+        console.error(
+          "Error mengambil komentar:",
+          error
+        );
+
+        setComments([]);
+      } finally {
+        setCommentsLoading(false);
+      }
+    };
+
+    loadComments();
+  }, [loaded]);
+
+  /* =========================================================
+     NAVIGATION
+  ========================================================= */
 
   const scrollToSection = (id: string) => {
     const target = document.getElementById(id);
@@ -278,55 +392,164 @@ export default function Home() {
     setMenuOpen(false);
   };
 
+  /* =========================================================
+     THEME TOGGLE
+  ========================================================= */
+
   const toggleTheme = () => {
     setDarkMode((current) => !current);
   };
 
-  const handleComment = (event: FormEvent<HTMLFormElement>) => {
+  /* =========================================================
+     SUBMIT COMMENT
+  ========================================================= */
+
+  const handleComment = async (
+    event: FormEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
 
     const cleanName = name.trim();
     const cleanComment = comment.trim();
 
-    if (!cleanName || !cleanComment) return;
+    if (
+      !cleanName ||
+      !cleanComment ||
+      commentLoading
+    ) {
+      return;
+    }
 
-    const newComment: Comment = {
-      id: Date.now(),
-      name: cleanName,
-      message: cleanComment,
-      date: new Date().toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-    };
+    setCommentLoading(true);
 
-    const updatedComments = [newComment, ...comments];
+    try {
+      const { data, error } = await supabase
+        .from("comments")
+        .insert({
+          name: cleanName,
+          message: cleanComment,
+        })
+        .select(
+          "id, name, message, created_at"
+        )
+        .single();
 
-    setComments(updatedComments);
-    localStorage.setItem("aulia-comments", JSON.stringify(updatedComments));
+      if (error) {
+        console.error(
+          "Gagal menyimpan komentar:",
+          error
+        );
 
-    setName("");
-    setComment("");
-    setCommentSent(true);
+        alert(
+          "Komentar gagal disimpan. Cek koneksi Supabase dan RLS."
+        );
 
-    setTimeout(() => {
-      setCommentSent(false);
-    }, 2500);
+        return;
+      }
+
+      if (data) {
+        setComments((current) => [
+          data as Comment,
+          ...current,
+        ]);
+      }
+
+      setName("");
+      setComment("");
+
+      setCommentSent(true);
+
+      window.setTimeout(() => {
+        setCommentSent(false);
+      }, 2500);
+    } catch (error) {
+      console.error("Error:", error);
+
+      alert(
+        "Terjadi kesalahan saat mengirim komentar."
+      );
+    } finally {
+      setCommentLoading(false);
+    }
   };
 
-  const deleteComment = (id: number) => {
-    const updatedComments = comments.filter((item) => item.id !== id);
+  /* =========================================================
+     DELETE COMMENT
+  ========================================================= */
 
-    setComments(updatedComments);
-    localStorage.setItem("aulia-comments", JSON.stringify(updatedComments));
+  const deleteComment = async (id: number) => {
+    const confirmed = window.confirm(
+      "Yakin ingin menghapus komentar ini?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from("comments")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        console.error(
+          "Gagal menghapus komentar:",
+          error
+        );
+
+        alert(
+          "Komentar gagal dihapus. Cek permission Supabase."
+        );
+
+        return;
+      }
+
+      setComments((current) =>
+        current.filter(
+          (item) => item.id !== id
+        )
+      );
+    } catch (error) {
+      console.error(
+        "Error menghapus komentar:",
+        error
+      );
+
+      alert(
+        "Terjadi kesalahan saat menghapus komentar."
+      );
+    }
   };
+
+  /* =========================================================
+     FORMAT DATE
+  ========================================================= */
+
+  const formatDate = (date: string) => {
+    try {
+      return new Intl.DateTimeFormat(
+        "id-ID",
+        {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }
+      ).format(new Date(date));
+    } catch {
+      return "";
+    }
+  };
+
+  /* =========================================================
+     LOADING SCREEN
+  ========================================================= */
 
   if (!loaded) {
     return (
       <div className="loading-screen">
         <div className="loader-content">
-          <p className="loader-small">PORTFOLIO / 2026</p>
+          <p className="loader-small">
+            PORTFOLIO / 2026
+          </p>
 
           <h1 className="loader-name">
             AULIA
@@ -337,24 +560,44 @@ export default function Home() {
             <span />
           </div>
 
-          <p className="loader-small">ILMU KOMUNIKASI · PHOTOGRAPHY · EDITING</p>
+          <p className="loader-small">
+            ILMU KOMUNIKASI · PHOTOGRAPHY · EDITING
+          </p>
         </div>
       </div>
     );
   }
 
+  /* =========================================================
+     PAGE
+  ========================================================= */
+
   return (
     <main>
+      {/* SCROLL PROGRESS */}
+
       <div
         className="scroll-progress"
-        style={{ width: `${scrollProgress}%` }}
+        style={{
+          width: `${scrollProgress}%`,
+        }}
       />
 
-      <header className={`site-header ${scrolled ? "is-scrolled" : ""}`}>
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
+
+      <header
+        className={`site-header ${
+          scrolled ? "is-scrolled" : ""
+        }`}
+      >
         <div className="header-inner">
           <button
             className="brand"
-            onClick={() => scrollToSection("home")}
+            onClick={() =>
+              scrollToSection("home")
+            }
             aria-label="Kembali ke Home"
           >
             <span>A.</span>
@@ -365,8 +608,14 @@ export default function Home() {
             {navItems.map((item) => (
               <button
                 key={item.id}
-                className={activeSection === item.id ? "active" : ""}
-                onClick={() => scrollToSection(item.id)}
+                className={
+                  activeSection === item.id
+                    ? "active"
+                    : ""
+                }
+                onClick={() =>
+                  scrollToSection(item.id)
+                }
               >
                 {item.label}
               </button>
@@ -379,12 +628,18 @@ export default function Home() {
               onClick={toggleTheme}
               aria-label="Ganti tema"
             >
-              {darkMode ? <Sun size={17} /> : <Moon size={17} />}
+              {darkMode ? (
+                <Sun size={17} />
+              ) : (
+                <Moon size={17} />
+              )}
             </button>
 
             <button
               className="header-contact"
-              onClick={() => scrollToSection("contact")}
+              onClick={() =>
+                scrollToSection("contact")
+              }
             >
               LET&apos;S TALK
               <ArrowUpRight size={15} />
@@ -392,13 +647,23 @@ export default function Home() {
 
             <button
               className="mobile-menu-button"
-              onClick={() => setMenuOpen((value) => !value)}
+              onClick={() =>
+                setMenuOpen(
+                  (value) => !value
+                )
+              }
               aria-label="Menu"
             >
-              {menuOpen ? <X size={22} /> : <Menu size={22} />}
+              {menuOpen ? (
+                <X size={22} />
+              ) : (
+                <Menu size={22} />
+              )}
             </button>
           </div>
         </div>
+
+        {/* MOBILE MENU */}
 
         {menuOpen && (
           <div className="mobile-menu">
@@ -406,7 +671,11 @@ export default function Home() {
               {navItems.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => scrollToSection(item.id)}
+                  onClick={() =>
+                    scrollToSection(
+                      item.id
+                    )
+                  }
                 >
                   <span>{item.label}</span>
                   <ArrowUpRight size={17} />
@@ -417,8 +686,14 @@ export default function Home() {
         )}
       </header>
 
-      {/* HERO */}
-      <section id="home" className="hero">
+      {/* =====================================================
+          HERO
+      ===================================================== */}
+
+      <section
+        id="home"
+        className="hero"
+      >
         <div className="hero-noise" />
 
         <div className="hero-container">
@@ -428,12 +703,16 @@ export default function Home() {
               PORTFOLIO — 2026
             </p>
 
-            <p className="hero-location">INDONESIA / CREATIVE PRACTICE</p>
+            <p className="hero-location">
+              INDONESIA / CREATIVE PRACTICE
+            </p>
           </div>
 
           <div className="hero-layout">
             <div className="hero-copy reveal">
-              <p className="eyebrow">ILMU KOMUNIKASI</p>
+              <p className="eyebrow">
+                ILMU KOMUNIKASI
+              </p>
 
               <h1 className="hero-title">
                 AULIA
@@ -442,14 +721,20 @@ export default function Home() {
               </h1>
 
               <p className="hero-description">
-                Communication student with a passion for photography,
-                visual storytelling, and photo & video editing.
+                Communication student with a
+                passion for photography, visual
+                storytelling, and photo &amp;
+                video editing.
               </p>
 
               <div className="hero-buttons">
                 <button
                   className="primary-button"
-                  onClick={() => scrollToSection("photography")}
+                  onClick={() =>
+                    scrollToSection(
+                      "photography"
+                    )
+                  }
                 >
                   EXPLORE WORK
                   <ArrowUpRight size={17} />
@@ -457,7 +742,11 @@ export default function Home() {
 
                 <button
                   className="text-button"
-                  onClick={() => scrollToSection("about")}
+                  onClick={() =>
+                    scrollToSection(
+                      "about"
+                    )
+                  }
                 >
                   DISCOVER MORE
                   <ArrowDown size={15} />
@@ -475,7 +764,9 @@ export default function Home() {
 
               <div className="hero-photo-caption">
                 <span>01</span>
-                <span>AULIA / PORTRAIT</span>
+                <span>
+                  AULIA / PORTRAIT
+                </span>
               </div>
             </div>
           </div>
@@ -485,6 +776,7 @@ export default function Home() {
               <span className="scroll-circle">
                 <ArrowDown size={15} />
               </span>
+
               SCROLL TO EXPLORE
             </div>
 
@@ -499,7 +791,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* MARQUEE */}
+      {/* =====================================================
+          MARQUEE
+      ===================================================== */}
+
       <section className="marquee-section">
         <div className="marquee-track">
           <span>COMMUNICATION</span>
@@ -508,7 +803,7 @@ export default function Home() {
           <b>✦</b>
           <span>VISUAL STORYTELLING</span>
           <b>✦</b>
-          <span>PHOTO & VIDEO EDITING</span>
+          <span>PHOTO &amp; VIDEO EDITING</span>
           <b>✦</b>
           <span>COMMUNICATION</span>
           <b>✦</b>
@@ -517,11 +812,19 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ABOUT */}
-      <section id="about" className="section about-section">
+      {/* =====================================================
+          ABOUT
+      ===================================================== */}
+
+      <section
+        id="about"
+        className="section about-section"
+      >
         <div className="section-container">
           <div className="section-heading reveal">
-            <span className="section-index">01 / ABOUT</span>
+            <span className="section-index">
+              01 / ABOUT
+            </span>
 
             <div className="heading-side">
               <span>WHO I AM</span>
@@ -537,21 +840,31 @@ export default function Home() {
 
             <div className="about-copy reveal">
               <p>
-                Saya percaya bahwa komunikasi bukan hanya tentang berbicara.
-                Cara kita menyampaikan pesan, memilih visual, dan membangun
-                sebuah cerita juga menjadi bagian penting dari komunikasi.
+                Saya percaya bahwa komunikasi
+                bukan hanya tentang berbicara.
+                Cara kita menyampaikan pesan,
+                memilih visual, dan membangun
+                sebuah cerita juga menjadi
+                bagian penting dari komunikasi.
               </p>
 
               <p>
-                Saya memiliki ketertarikan pada Ilmu Komunikasi, fotografi,
-                visual storytelling, serta proses editing foto dan video.
-                Portfolio ini menjadi ruang untuk menampilkan proses belajar
+                Saya memiliki ketertarikan pada
+                Ilmu Komunikasi, fotografi,
+                visual storytelling, serta
+                proses editing foto dan video.
+                Portfolio ini menjadi ruang
+                untuk menampilkan proses belajar
                 dan karya yang saya kembangkan.
               </p>
 
               <button
                 className="line-link"
-                onClick={() => scrollToSection("communication")}
+                onClick={() =>
+                  scrollToSection(
+                    "communication"
+                  )
+                }
               >
                 EXPLORE MY SKILLS
                 <ArrowUpRight size={16} />
@@ -583,14 +896,24 @@ export default function Home() {
         </div>
       </section>
 
-      {/* COMMUNICATION */}
-      <section id="communication" className="section communication-section">
+      {/* =====================================================
+          COMMUNICATION
+      ===================================================== */}
+
+      <section
+        id="communication"
+        className="section communication-section"
+      >
         <div className="section-container">
           <div className="section-heading reveal">
-            <span className="section-index">02 / COMMUNICATION</span>
+            <span className="section-index">
+              02 / COMMUNICATION
+            </span>
 
             <div className="heading-side">
-              <span>THE WAY I CONNECT</span>
+              <span>
+                THE WAY I CONNECT
+              </span>
             </div>
           </div>
 
@@ -602,29 +925,52 @@ export default function Home() {
             </h2>
 
             <p>
-              Kemampuan komunikasi saya dikembangkan melalui proses belajar,
-              presentasi, storytelling, membuat konsep, dan memahami bagaimana
-              sebuah pesan dapat diterima oleh audiens.
+              Kemampuan komunikasi saya
+              dikembangkan melalui proses
+              belajar, presentasi,
+              storytelling, membuat konsep,
+              dan memahami bagaimana sebuah
+              pesan dapat diterima oleh
+              audiens.
             </p>
           </div>
 
           <div className="skill-list reveal">
-            {communicationSkills.map((skill, index) => (
-              <div className="skill-row" key={skill}>
-                <span>0{index + 1}</span>
-                <strong>{skill}</strong>
-                <ArrowUpRight size={17} />
-              </div>
-            ))}
+            {communicationSkills.map(
+              (skill, index) => (
+                <div
+                  className="skill-row"
+                  key={skill}
+                >
+                  <span>
+                    {String(
+                      index + 1
+                    ).padStart(2, "0")}
+                  </span>
+
+                  <strong>{skill}</strong>
+
+                  <ArrowUpRight size={17} />
+                </div>
+              )
+            )}
           </div>
         </div>
       </section>
 
-      {/* JOURNEY */}
-      <section id="journey" className="section journey-section">
+      {/* =====================================================
+          JOURNEY
+      ===================================================== */}
+
+      <section
+        id="journey"
+        className="section journey-section"
+      >
         <div className="section-container">
           <div className="section-heading reveal">
-            <span className="section-index">03 / JOURNEY</span>
+            <span className="section-index">
+              03 / JOURNEY
+            </span>
 
             <div className="heading-side">
               <span>LEARNING PROCESS</span>
@@ -633,60 +979,99 @@ export default function Home() {
 
           <div className="journey-list">
             {journey.map((item) => (
-              <article className="journey-item reveal" key={item.number}>
-                <span className="journey-number">{item.number}</span>
+              <article
+                className="journey-item reveal"
+                key={item.number}
+              >
+                <span className="journey-number">
+                  {item.number}
+                </span>
 
-                <span className="journey-year">{item.year}</span>
+                <span className="journey-year">
+                  {item.year}
+                </span>
 
                 <div className="journey-content">
                   <h3>{item.title}</h3>
+
                   <p>{item.text}</p>
                 </div>
 
-                <ArrowUpRight className="journey-arrow" size={21} />
+                <ArrowUpRight
+                  className="journey-arrow"
+                  size={21}
+                />
               </article>
             ))}
           </div>
         </div>
       </section>
 
-      {/* PHOTOGRAPHY */}
-      <section id="photography" className="section photography-section">
+      {/* =====================================================
+          PHOTOGRAPHY
+      ===================================================== */}
+
+      <section
+        id="photography"
+        className="section photography-section"
+      >
         <div className="section-container">
           <div className="section-heading reveal">
-            <span className="section-index">04 / PHOTOGRAPHY</span>
+            <span className="section-index">
+              04 / PHOTOGRAPHY
+            </span>
 
             <div className="heading-side">
-              <span>CAPTURE THE MOMENT</span>
+              <span>
+                CAPTURE THE MOMENT
+              </span>
             </div>
           </div>
 
           <div className="photo-intro reveal">
             <div>
-              <p className="eyebrow">PHOTOGRAPHY</p>
+              <p className="eyebrow">
+                PHOTOGRAPHY
+              </p>
 
               <h2>
                 Moments
                 <br />
-                worth <em>remembering.</em>
+                worth{" "}
+                <em>remembering.</em>
               </h2>
             </div>
 
             <p>
-              Fotografi menjadi salah satu cara saya menggabungkan komunikasi
-              dan visual. Saya tertarik pada portrait, dokumentasi, street
-              photography, serta visual storytelling.
+              Fotografi menjadi salah satu
+              cara saya menggabungkan
+              komunikasi dan visual. Saya
+              tertarik pada portrait,
+              dokumentasi, street
+              photography, serta visual
+              storytelling.
             </p>
           </div>
 
           <div className="photo-horizontal">
             {photos.map((photo, index) => (
-              <article className="photo-card reveal" key={photo.src}>
+              <article
+                className="photo-card reveal"
+                key={photo.src}
+              >
                 <div className="photo-image">
-                  <img src={photo.src} alt={photo.title} />
+                  <img
+                    src={photo.src}
+                    alt={photo.title}
+                  />
 
                   <div className="photo-overlay">
-                    <span>0{index + 1}</span>
+                    <span>
+                      {String(
+                        index + 1
+                      ).padStart(2, "0")}
+                    </span>
+
                     <Camera size={20} />
                   </div>
                 </div>
@@ -704,27 +1089,43 @@ export default function Home() {
           </div>
 
           <div className="photo-skills reveal">
-            {photographySkills.map((skill) => (
-              <span key={skill}>{skill}</span>
-            ))}
+            {photographySkills.map(
+              (skill) => (
+                <span key={skill}>
+                  {skill}
+                </span>
+              )
+            )}
           </div>
         </div>
       </section>
 
-      {/* EDITING */}
-      <section id="editing" className="section editing-section">
+      {/* =====================================================
+          EDITING
+      ===================================================== */}
+
+      <section
+        id="editing"
+        className="section editing-section"
+      >
         <div className="section-container">
           <div className="section-heading reveal">
-            <span className="section-index">05 / EDITING</span>
+            <span className="section-index">
+              05 / EDITING
+            </span>
 
             <div className="heading-side">
-              <span>SHAPE THE VISUAL</span>
+              <span>
+                SHAPE THE VISUAL
+              </span>
             </div>
           </div>
 
           <div className="editing-layout">
             <div className="editing-copy reveal">
-              <p className="eyebrow">PHOTO & VIDEO EDITING</p>
+              <p className="eyebrow">
+                PHOTO &amp; VIDEO EDITING
+              </p>
 
               <h2 className="editing-title">
                 From raw
@@ -733,15 +1134,23 @@ export default function Home() {
               </h2>
 
               <p className="editing-description">
-                Editing bukan hanya memperbaiki gambar. Saya menggunakan
-                warna, tone, composition, rhythm, dan detail untuk membuat
-                visual memiliki mood serta pesan yang lebih kuat.
+                Editing bukan hanya
+                memperbaiki gambar. Saya
+                menggunakan warna, tone,
+                composition, rhythm, dan
+                detail untuk membuat visual
+                memiliki mood serta pesan
+                yang lebih kuat.
               </p>
 
               <div className="editing-tools">
-                {editingSkills.map((skill) => (
-                  <span key={skill}>{skill}</span>
-                ))}
+                {editingSkills.map(
+                  (skill) => (
+                    <span key={skill}>
+                      {skill}
+                    </span>
+                  )
+                )}
               </div>
             </div>
 
@@ -753,7 +1162,10 @@ export default function Home() {
               />
 
               <div className="editing-image-label">
-                <span>BEFORE / AFTER</span>
+                <span>
+                  BEFORE / AFTER
+                </span>
+
                 <ArrowUpRight size={17} />
               </div>
 
@@ -767,31 +1179,53 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SELECTED WORK */}
+      {/* =====================================================
+          SELECTED WORK
+      ===================================================== */}
+
       <section className="section projects-section">
         <div className="section-container">
           <div className="section-heading reveal">
-            <span className="section-index">06 / SELECTED WORK</span>
+            <span className="section-index">
+              06 / SELECTED WORK
+            </span>
 
             <div className="heading-side">
-              <span>RECENT CREATIVE DIRECTION</span>
+              <span>
+                RECENT CREATIVE DIRECTION
+              </span>
             </div>
           </div>
 
           <div className="projects-list">
             {projects.map((project) => (
-              <article className="project-row reveal" key={project.number}>
-                <span className="project-number">{project.number}</span>
+              <article
+                className="project-row reveal"
+                key={project.number}
+              >
+                <span className="project-number">
+                  {project.number}
+                </span>
 
                 <div className="project-main">
-                  <span>{project.category}</span>
+                  <span>
+                    {project.category}
+                  </span>
+
                   <h3>{project.title}</h3>
-                  <p>{project.description}</p>
+
+                  <p>
+                    {project.description}
+                  </p>
                 </div>
 
                 <button
                   className="project-action"
-                  onClick={() => scrollToSection("contact")}
+                  onClick={() =>
+                    scrollToSection(
+                      "contact"
+                    )
+                  }
                   aria-label={`Hubungi Aulia tentang ${project.title}`}
                 >
                   <ArrowUpRight size={21} />
@@ -802,35 +1236,54 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CONTACT + COMMENT */}
-      <section id="contact" className="section contact-section">
+      {/* =====================================================
+          CONTACT
+      ===================================================== */}
+
+      <section
+        id="contact"
+        className="section contact-section"
+      >
         <div className="section-container">
           <div className="section-heading reveal">
-            <span className="section-index">07 / CONTACT</span>
+            <span className="section-index">
+              07 / CONTACT
+            </span>
 
             <div className="heading-side">
-              <span>LET&apos;S CONNECT</span>
+              <span>
+                LET&apos;S CONNECT
+              </span>
             </div>
           </div>
 
           <div className="contact-top reveal">
-            <p className="eyebrow">HAVE A PROJECT / IDEA?</p>
+            <p className="eyebrow">
+              HAVE A PROJECT / IDEA?
+            </p>
 
             <h2 className="contact-title">
               Let&apos;s create
               <br />
-              something <em>meaningful.</em>
+              something{" "}
+              <em>meaningful.</em>
             </h2>
           </div>
 
           <div className="contact-grid">
+            {/* CONTACT LINKS */}
+
             <div className="contact-links reveal">
               <a href="mailto:aulia@example.com">
                 <span>
                   <Mail size={18} />
                   EMAIL
                 </span>
-                <strong>aulia@example.com</strong>
+
+                <strong>
+                  aulia@example.com
+                </strong>
+
                 <ArrowUpRight size={17} />
               </a>
 
@@ -843,64 +1296,109 @@ export default function Home() {
                   <Instagram size={18} />
                   INSTAGRAM
                 </span>
-                <strong>@auliafairosa</strong>
+
+                <strong>
+                  @auliafairosa
+                </strong>
+
                 <ArrowUpRight size={17} />
               </a>
             </div>
 
-            <form className="contact-form reveal" onSubmit={handleComment}>
+            {/* COMMENT FORM */}
+
+            <form
+              className="contact-form reveal"
+              onSubmit={handleComment}
+            >
               <div className="form-row">
-                <label htmlFor="name">NAMA</label>
+                <label htmlFor="name">
+                  NAMA
+                </label>
 
                 <input
                   id="name"
                   type="text"
                   placeholder="Nama kamu"
                   value={name}
-                  onChange={(event) => setName(event.target.value)}
+                  onChange={(event) =>
+                    setName(
+                      event.target.value
+                    )
+                  }
                   required
+                  maxLength={80}
                 />
               </div>
 
               <div className="form-row">
-                <label htmlFor="comment">PESAN / KOMENTAR</label>
+                <label htmlFor="comment">
+                  PESAN / KOMENTAR
+                </label>
 
                 <textarea
                   id="comment"
                   placeholder="Tulis pesan atau komentar..."
                   rows={5}
                   value={comment}
-                  onChange={(event) => setComment(event.target.value)}
+                  onChange={(event) =>
+                    setComment(
+                      event.target.value
+                    )
+                  }
                   required
+                  maxLength={500}
                 />
               </div>
 
-              <button className="submit-button" type="submit">
-                {commentSent ? (
+              <button
+                className="submit-button"
+                type="submit"
+                disabled={commentLoading}
+              >
+                {commentLoading ? (
                   <>
-                    TERSIMPAN
-                    <Check size={17} />
+                    MENGIRIM...
+                    <Send
+                      size={16}
+                    />
+                  </>
+                ) : commentSent ? (
+                  <>
+                    TERKIRIM
+                    <Check
+                      size={17}
+                    />
                   </>
                 ) : (
                   <>
                     KIRIM KOMENTAR
-                    <Send size={16} />
+                    <Send
+                      size={16}
+                    />
                   </>
                 )}
               </button>
 
               <p className="form-note">
-                Komentar akan disimpan di browser dan langsung ditampilkan di
-                halaman ini.
+                Komentar akan disimpan ke
+                database dan langsung
+                ditampilkan di halaman ini.
               </p>
             </form>
           </div>
 
-          {/* COMMENTS */}
+          {/* =================================================
+              COMMENTS
+          ================================================= */}
+
           <div className="comments-area reveal">
             <div className="comments-header">
               <div>
-                <p className="eyebrow">VISITOR COMMENTS</p>
+                <p className="eyebrow">
+                  VISITOR COMMENTS
+                </p>
+
                 <h3>
                   What people
                   <br />
@@ -908,33 +1406,69 @@ export default function Home() {
                 </h3>
               </div>
 
-              <span>{comments.length} COMMENTS</span>
+              <span>
+                {comments.length} COMMENTS
+              </span>
             </div>
 
-            {comments.length === 0 ? (
+            {commentsLoading ? (
               <div className="empty-comments">
-                <p>Belum ada komentar.</p>
-                <span>Jadilah orang pertama yang meninggalkan pesan.</span>
+                <p>
+                  Memuat komentar...
+                </p>
+
+                <span>
+                  Mohon tunggu sebentar.
+                </span>
+              </div>
+            ) : comments.length === 0 ? (
+              <div className="empty-comments">
+                <p>
+                  Belum ada komentar.
+                </p>
+
+                <span>
+                  Jadilah orang pertama
+                  yang meninggalkan pesan.
+                </span>
               </div>
             ) : (
               <div className="comments-list">
                 {comments.map((item) => (
-                  <article className="comment-item" key={item.id}>
+                  <article
+                    className="comment-item"
+                    key={item.id}
+                  >
                     <div className="comment-avatar">
-                      {item.name.charAt(0).toUpperCase()}
+                      {item.name
+                        .charAt(0)
+                        .toUpperCase()}
                     </div>
 
                     <div className="comment-content">
                       <div className="comment-top">
-                        <strong>{item.name}</strong>
-                        <span>{item.date}</span>
+                        <strong>
+                          {item.name}
+                        </strong>
+
+                        <span>
+                          {formatDate(
+                            item.created_at
+                          )}
+                        </span>
                       </div>
 
-                      <p>{item.message}</p>
+                      <p>
+                        {item.message}
+                      </p>
 
                       <button
                         type="button"
-                        onClick={() => deleteComment(item.id)}
+                        onClick={() =>
+                          deleteComment(
+                            item.id
+                          )
+                        }
                       >
                         HAPUS
                       </button>
@@ -947,24 +1481,30 @@ export default function Home() {
         </div>
       </section>
 
-      {/* FOOTER */}
+      {/* =====================================================
+          FOOTER
+      ===================================================== */}
+
       <footer className="footer">
         <div className="footer-container">
           <div className="footer-brand">
             <span>A.</span>
 
             <div>
-              <strong>AULIA FAIROSA NUR AINI</strong>
+              <strong>
+                AULIA FAIROSA NUR AINI
+              </strong>
+
               <p>
                 Communication · Photography
                 <br />
-                Photo & Video Editing
+                Photo &amp; Video Editing
               </p>
             </div>
           </div>
 
           <div className="footer-info">
-            <span>power by</span>
+            <span>powered by</span>
 
             <a
               href={INSTAGRAM_URL}
@@ -978,7 +1518,9 @@ export default function Home() {
 
           <button
             className="back-top"
-            onClick={() => scrollToSection("home")}
+            onClick={() =>
+              scrollToSection("home")
+            }
           >
             BACK TO TOP
             <ArrowUp size={15} />
@@ -986,8 +1528,13 @@ export default function Home() {
         </div>
 
         <div className="footer-bottom">
-          <span>© 2026 AULIA FAIROSA NUR AINI</span>
-          <span>BY KUKZ 2026</span>
+          <span>
+            © 2026 AULIA FAIROSA NUR AINI
+          </span>
+
+          <span>
+            BY KUKZ 2026
+          </span>
         </div>
       </footer>
     </main>
