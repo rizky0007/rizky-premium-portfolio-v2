@@ -1,8 +1,6 @@
 "use client";
 
-import { supabase } from "../lib/supabase";
 import { FormEvent, useEffect, useRef, useState } from "react";
-
 import {
   ArrowDown,
   ArrowUp,
@@ -17,12 +15,13 @@ import {
   Sun,
   X,
 } from "lucide-react";
+import { supabase } from "../lib/supabase";
 
 /* =========================================================
    CONFIG
 ========================================================= */
 
-const INSTAGRAM_URL = "https://www.instagram.com/";
+const INSTAGRAM_URL = "https://www.instagram.com/auliafairosa/";
 
 const navItems = [
   { label: "Home", id: "home" },
@@ -42,7 +41,8 @@ type Comment = {
   id: number;
   name: string;
   message: string;
-  created_at: string;
+  created_at?: string;
+  date?: string;
 };
 
 /* =========================================================
@@ -222,15 +222,17 @@ export default function Home() {
         document.documentElement.scrollHeight - window.innerHeight;
 
       const progress =
-        documentHeight > 0 ? (scrollTop / documentHeight) * 100 : 0;
+        documentHeight > 0
+          ? (scrollTop / documentHeight) * 100
+          : 0;
 
       setScrolled(scrollTop > 30);
       setScrollProgress(progress);
 
       if (heroPhotoRef.current) {
         const offset = Math.min(scrollTop * 0.08, 80);
-
-        heroPhotoRef.current.style.transform = `translateY(${offset}px)`;
+        heroPhotoRef.current.style.transform =
+          `translateY(${offset}px)`;
       }
     };
 
@@ -321,7 +323,10 @@ export default function Home() {
   ========================================================= */
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", darkMode);
+    document.documentElement.classList.toggle(
+      "dark",
+      darkMode
+    );
 
     localStorage.setItem(
       "aulia-theme",
@@ -342,7 +347,9 @@ export default function Home() {
       try {
         const { data, error } = await supabase
           .from("comments")
-          .select("id, name, message, created_at")
+          .select(
+            "id, name, message, created_at"
+          )
           .order("created_at", {
             ascending: false,
           });
@@ -456,7 +463,6 @@ export default function Home() {
 
       setName("");
       setComment("");
-
       setCommentSent(true);
 
       window.setTimeout(() => {
@@ -524,19 +530,23 @@ export default function Home() {
      FORMAT DATE
   ========================================================= */
 
-  const formatDate = (date: string) => {
-    try {
-      return new Intl.DateTimeFormat(
-        "id-ID",
-        {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }
-      ).format(new Date(date));
-    } catch {
+  const formatDate = (date?: string) => {
+    if (!date) return "";
+
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
       return "";
     }
+
+    return new Intl.DateTimeFormat(
+      "id-ID",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }
+    ).format(parsedDate);
   };
 
   /* =========================================================
@@ -583,9 +593,7 @@ export default function Home() {
         }}
       />
 
-      {/* =====================================================
-          HEADER
-      ===================================================== */}
+      {/* HEADER */}
 
       <header
         className={`site-header ${
@@ -672,9 +680,7 @@ export default function Home() {
                 <button
                   key={item.id}
                   onClick={() =>
-                    scrollToSection(
-                      item.id
-                    )
+                    scrollToSection(item.id)
                   }
                 >
                   <span>{item.label}</span>
@@ -686,9 +692,7 @@ export default function Home() {
         )}
       </header>
 
-      {/* =====================================================
-          HERO
-      ===================================================== */}
+      {/* HERO */}
 
       <section
         id="home"
@@ -743,9 +747,7 @@ export default function Home() {
                 <button
                   className="text-button"
                   onClick={() =>
-                    scrollToSection(
-                      "about"
-                    )
+                    scrollToSection("about")
                   }
                 >
                   DISCOVER MORE
@@ -776,7 +778,6 @@ export default function Home() {
               <span className="scroll-circle">
                 <ArrowDown size={15} />
               </span>
-
               SCROLL TO EXPLORE
             </div>
 
@@ -791,9 +792,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* =====================================================
-          MARQUEE
-      ===================================================== */}
+      {/* MARQUEE */}
 
       <section className="marquee-section">
         <div className="marquee-track">
@@ -812,9 +811,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* =====================================================
-          ABOUT
-      ===================================================== */}
+      {/* ABOUT */}
 
       <section
         id="about"
@@ -896,9 +893,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* =====================================================
-          COMMUNICATION
-      ===================================================== */}
+      {/* COMMUNICATION */}
 
       <section
         id="communication"
@@ -958,9 +953,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* =====================================================
-          JOURNEY
-      ===================================================== */}
+      {/* JOURNEY */}
 
       <section
         id="journey"
@@ -993,7 +986,6 @@ export default function Home() {
 
                 <div className="journey-content">
                   <h3>{item.title}</h3>
-
                   <p>{item.text}</p>
                 </div>
 
@@ -1007,9 +999,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* =====================================================
-          PHOTOGRAPHY
-      ===================================================== */}
+      {/* PHOTOGRAPHY */}
 
       <section
         id="photography"
@@ -1100,9 +1090,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* =====================================================
-          EDITING
-      ===================================================== */}
+      {/* EDITING */}
 
       <section
         id="editing"
@@ -1179,9 +1167,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* =====================================================
-          SELECTED WORK
-      ===================================================== */}
+      {/* SELECTED WORK */}
 
       <section className="section projects-section">
         <div className="section-container">
@@ -1236,9 +1222,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* =====================================================
-          CONTACT
-      ===================================================== */}
+      {/* CONTACT */}
 
       <section
         id="contact"
@@ -1359,23 +1343,17 @@ export default function Home() {
                 {commentLoading ? (
                   <>
                     MENGIRIM...
-                    <Send
-                      size={16}
-                    />
+                    <Send size={16} />
                   </>
                 ) : commentSent ? (
                   <>
                     TERKIRIM
-                    <Check
-                      size={17}
-                    />
+                    <Check size={17} />
                   </>
                 ) : (
                   <>
                     KIRIM KOMENTAR
-                    <Send
-                      size={16}
-                    />
+                    <Send size={16} />
                   </>
                 )}
               </button>
@@ -1388,9 +1366,7 @@ export default function Home() {
             </form>
           </div>
 
-          {/* =================================================
-              COMMENTS
-          ================================================= */}
+          {/* COMMENTS */}
 
           <div className="comments-area reveal">
             <div className="comments-header">
@@ -1453,7 +1429,8 @@ export default function Home() {
 
                         <span>
                           {formatDate(
-                            item.created_at
+                            item.created_at ??
+                              item.date
                           )}
                         </span>
                       </div>
@@ -1481,9 +1458,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* =====================================================
-          FOOTER
-      ===================================================== */}
+      {/* FOOTER */}
 
       <footer className="footer">
         <div className="footer-container">
